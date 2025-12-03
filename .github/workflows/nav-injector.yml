@@ -1,68 +1,67 @@
-name: Inject nav into README files
+name: Inject Navigation Menu
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write   # IMPORTANT: allows pushing back to repo
 
 jobs:
-  inject-nav:
+  inject:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
-      - name: Read nav template
+      - name: Load nav template
         id: nav
         run: |
-          echo "nav<<EOF" >> $GITHUB_OUTPUT
-          cat nav-template.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          NAV_CONTENT=$(cat nav-template.md)
+          # Escape for safe multi-line storage
+          NAV_CONTENT="${NAV_CONTENT//'%'/'%25'}"
+          NAV_CONTENT="${NAV_CONTENT//$'\n'/'%0A'}"
+          NAV_CONTENT="${NAV_CONTENT//$'\r'/'%0D'}"
+          echo "nav=$NAV_CONTENT" >> $GITHUB_OUTPUT
 
-      - name: Inject nav into README files (safe mode)
+      - name: Inject nav into README.md files
         run: |
-          NAV="${{ steps.nav.outputs.nav }}"
+          echo "Starting injection..."
+          nav="${{ steps.nav.outputs.nav }}"
 
-          # Find all README.md files safely (-print0 prevents spacing issues)
+          # Find all README.md safely even with spaces/UTF-8
           find . -type f -name "README.md" -print0 | while IFS= read -r -d '' file; do
-            
-            # Skip if already present
+            echo "Processing $file"
+
+            # Skip if already injected
             if grep -q "📘 Navigation Menu" "$file"; then
-              echo "Skipping $file — nav already present."
+              echo " -- Skipping (already has nav)"
               continue
             fi
 
-            echo "Injecting nav into $file"
+            # Create temp file
+            tmp=$(mktemp)
+            printf "%b\n" "$nav" > "$tmp"
+            cat "$file" >> "$tmp"
+            mv "$tmp" "$file"
 
-            # Build a tmp file
-            TMPFILE=$(mktemp)
-
-            # Add nav + original content
-            printf "%s\n\n" "$NAV" > "$TMPFILE"
-            cat "$file" >> "$TMPFILE"
-
-            # Replace file safely
-            mv "$TMPFILE" "$file"
-
+            echo " -- Injected nav into $file"
           done
 
-      - name: Commit and push changes
+      - name: Commit changes
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add .
-          if git diff --cached --quiet; then
+          if git diff --quiet; then
             echo "No changes to commit."
             exit 0
           fi
 
+          git add .
           git commit -m "Auto-injected nav menu"
           git push
