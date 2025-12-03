@@ -2,45 +2,76 @@ name: Inject Navigation Menu
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - "**/*.md"
-      - ".github/nav-template.md"
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "*" ]
 
 jobs:
-  inject:
+  inject-nav:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write  # allows committing changes
+      pull-requests: write
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Load nav template
-      id: nav
-      run: |
-        NAV_CONTENT="$(cat .github/nav-template.md)"
-        NAV_CONTENT="${NAV_CONTENT//$'\n'/\\n}"
-        echo "nav=$NAV_CONTENT" >> $GITHUB_OUTPUT
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-    - name: Inject nav into README files
-      run: |
-        for file in $(git ls-files '*.md'); do
-          if grep -q "<!-- inject-nav -->" "$file"; then
+      - name: Create nav template
+        run: |
+          cat << 'EOF' > nav-template.md
+          <details>
+          <summary><strong>📘 Navigation Menu</strong> (click to expand)</summary>
+
+          - [🏠 Home](/)
+          - [🚀 PRE-EFS Dev](/README.md)
+          - [🧰 EKS Toolkit](/pre-eks-provisioning-toolkit/README.md)
+          - [🛠 Istio Install](/istio-install/README.md)
+          - [🌐 Gloo Install](/gloo-install/README.md)
+          - [🧪 Crossplane Tests](/test-crossplane/README.md)
+
+          </details>
+
+          ---
+          EOF
+
+      - name: Inject nav into README.md files
+        run: |
+          NAV=$(cat nav-template.md)
+
+          # Loop through all README.md files
+          for file in $(find . -type f -name "README.md"); do
+            # Skip if nav already exists
+            if grep -q "📘 Navigation Menu" "$file"; then
+              echo "Skipping $file — nav already present."
+              continue
+            fi
+            
             echo "Injecting nav into $file"
-            sed -i "s|<!-- inject-nav -->|${{ steps.nav.outputs.nav }}|g" "$file"
+            TMPFILE=$(mktemp)
+
+            # Write nav + original content
+            echo "$NAV" > "$TMPFILE"
+            cat "$file" >> "$TMPFILE"
+            mv "$TMPFILE" "$file"
+          done
+
+      - name: Commit changes
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git add .
+            git commit -m "Auto-injected navigation menu"
+            git push
+          else
+            echo "No changes to commit."
           fi
-        done
-
-    - name: Commit changes
-      run: |
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        git config --global user.name "github-actions[bot]"
-        if [[ -n $(git status --porcelain) ]]; then
-          git add .
-          git commit -m "Auto-injected nav menu"
-          git push
-        else
-          echo "No changes to commit."
-        fi
-
