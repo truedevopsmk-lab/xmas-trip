@@ -17,58 +17,56 @@ jobs:
         id: nav
         shell: bash
         run: |
-          echo "Generating navigation menu..."
+          echo "Generating navigation..."
 
           NAV="## 📘 Navigation Menu\n"
 
-          # Find all README.md files safely
+          urlencode() {
+            local raw="$1"
+            python3 - <<EOF
+import urllib.parse
+print(urllib.parse.quote("$raw"))
+EOF
+          }
+
+          # Find README.md files safely
           while IFS= read -r -d '' readme; do
             folder="$(dirname "$readme")"
 
-            # Skip .github and hidden dirs
-            [[ "$folder" == "." ]] && {
-              NAV+="[🏠 Home](/README.md) • "
-              continue
-            }
+            # Skip root and .github
+            [[ "$folder" == "." ]] && continue
             [[ "$folder" == .github* ]] && continue
-            [[ "$folder" == .* ]] && continue
 
             name="$(basename "$folder")"
             pretty="$(echo "$name" | sed 's/-/ /g')"
 
-            # Encode folder safely for URLs
-            encoded=$(python3 - "$folder" << 'EOF'
-import sys, urllib.parse
-path = sys.argv[1].lstrip("./")
-print(urllib.parse.quote(path))
-EOF
-)
+            encoded=$(urlencode "$folder")
 
             NAV+="[$pretty](/$encoded/README.md) • "
 
           done < <(find . -type f -name "README.md" -print0)
 
-          NAV+="\n\n---\n<!-- inject-nav -->"
+          # Add Home link at start
+          NAV="[🏠 Home](/README.md) • $NAV\n\n---\n<!-- inject-nav -->"
 
           {
             echo "nav<<EOF"
             echo -e "$NAV"
             echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          } >> $GITHUB_OUTPUT
 
-      - name: Inject nav into README files
+      - name: Inject nav into README.md files
         shell: bash
         run: |
           NAV_CONTENT="${{ steps.nav.outputs.nav }}"
-          echo "Injecting nav..."
 
           while IFS= read -r -d '' file; do
+            # Skip injected
             if grep -q "<!-- inject-nav -->" "$file"; then
-              echo "Skipping $file — nav already exists."
+              echo "Skipping $file"
               continue
             fi
 
-            echo "Injecting into $file"
             tmp=$(mktemp)
             echo -e "$NAV_CONTENT" > "$tmp"
             cat "$file" >> "$tmp"
