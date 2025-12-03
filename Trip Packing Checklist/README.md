@@ -1,3 +1,4 @@
+## 📘 Navigation Menu%0A[🏠 Home](./README.md) •  %0A[🎄 Budapest](./Budapest/README.md) •  %0A[🗺 Attractions](./Attractions,%2520Cafés%2520&%2520Local%2520Specialties/README.md) •  %0A[🧳 Packing Checklist](./Trip%2520Packing%2520Checklist/README.md) •  %0A[🌍 All Places](./places/README.md)%0A%0A---
 <!-- inject-nav -->
 
 # Europe Winter Trip 2025 – Master Checklist
