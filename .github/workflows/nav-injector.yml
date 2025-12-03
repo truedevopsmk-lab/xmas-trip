@@ -2,66 +2,47 @@ name: Inject Navigation Menu
 
 on:
   push:
-    branches:
-      - main
-
-permissions:
-  contents: write   # IMPORTANT: allows pushing back to repo
+    branches: [ "main" ]
 
 jobs:
   inject:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    - name: Checkout repo
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
 
-      - name: Load nav template
-        id: nav
-        run: |
-          NAV_CONTENT=$(cat nav-template.md)
-          # Escape for safe multi-line storage
-          NAV_CONTENT="${NAV_CONTENT//'%'/'%25'}"
-          NAV_CONTENT="${NAV_CONTENT//$'\n'/'%0A'}"
-          NAV_CONTENT="${NAV_CONTENT//$'\r'/'%0D'}"
-          echo "nav=$NAV_CONTENT" >> $GITHUB_OUTPUT
+    - name: Inject nav into README.md
+      run: |
+        echo "=== NAV TEMPLATE CONTENT ==="
+        cat nav-template.md || (echo "nav-template.md missing!" && exit 1)
 
-      - name: Inject nav into README.md files
-        run: |
-          echo "Starting injection..."
-          nav="${{ steps.nav.outputs.nav }}"
+        NAV="$(cat nav-template.md)"
 
-          # Find all README.md safely even with spaces/UTF-8
-          find . -type f -name "README.md" -print0 | while IFS= read -r -d '' file; do
-            echo "Processing $file"
-
-            # Skip if already injected
-            if grep -q "📘 Navigation Menu" "$file"; then
-              echo " -- Skipping (already has nav)"
-              continue
-            fi
-
-            # Create temp file
-            tmp=$(mktemp)
-            printf "%b\n" "$nav" > "$tmp"
-            cat "$file" >> "$tmp"
-            mv "$tmp" "$file"
-
-            echo " -- Injected nav into $file"
-          done
-
-      - name: Commit changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          if git diff --quiet; then
-            echo "No changes to commit."
-            exit 0
+        # Loop through all README.md files
+        find . -type f -name "README.md" | while read file; do
+          # Skip if already injected
+          if grep -q "<!-- inject-nav -->" "$file"; then
+            echo "Skipping $file — nav already present."
+            continue
           fi
 
-          git add .
-          git commit -m "Auto-injected nav menu"
-          git push
+          echo "Injecting nav into $file"
+
+          TMP=$(mktemp)
+          echo "$NAV" > "$TMP"
+          echo "" >> "$TMP"
+          cat "$file" >> "$TMP"
+          mv "$TMP" "$file"
+        done
+
+    - name: Commit changes
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+        git add .
+        git commit -m "Auto-injected nav menu" || echo "No changes to commit."
+        git push || echo "Cannot push — likely no permissions."
