@@ -1,0 +1,89 @@
+name: Inject Navigation Menu
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  inject:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Build navigation menu dynamically
+        id: nav
+        run: |
+          echo "Generating navigation..."
+
+          NAV="## 📘 Navigation Menu\n"
+
+          # Add root Home link
+          NAV+="[🏠 Home](/README.md)"
+
+          # Loop through folders safely
+          while IFS= read -r -d '' folder; do
+            # Skip hidden folders and .github
+            basename=$(basename "$folder")
+            case "$basename" in
+              .*|.github|.git) continue ;;
+            esac
+
+            # If folder contains a README.md, add it to nav
+            if [ -f "$folder/README.md" ]; then
+              link_name="${basename//-/ }"
+              NAV+=" • [${link_name^}](/$basename/README.md)"
+            fi
+          done < <(find . -mindepth 1 -maxdepth 1 -type d -print0)
+
+          NAV+="\n\n---\n<!-- inject-nav -->\n"
+
+          # Save nav to output
+          echo "nav<<EOF" >> $GITHUB_ENV
+          echo -e "$NAV" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Inject nav into READMEs
+        run: |
+          echo "Injecting into README.md files..."
+
+          # For every README.md found
+          find . -type f -name "README.md" -print0 | while IFS= read -r -d '' file; do
+
+            # Skip if already injected
+            if grep -q "<!-- inject-nav -->" "$file"; then
+              echo "Skipping $file (already injected)"
+              continue
+            fi
+
+            echo "Injecting navigation into $file"
+
+            # temp file
+            TMP=$(mktemp)
+
+            # Write nav + original file
+            echo -e "$nav" > "$TMP"
+            cat "$file" >> "$TMP"
+
+            mv "$TMP" "$file"
+          done
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+
+          # Commit only if there are changes
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Auto-injected navigation menu"
+            git push
+          fi
+
