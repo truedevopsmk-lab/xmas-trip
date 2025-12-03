@@ -17,55 +17,54 @@ jobs:
         id: nav
         shell: bash
         run: |
-          echo "Generating navigation..."
+          echo "Generating navigation menu..."
 
           NAV="## 📘 Navigation Menu\n"
 
-          # Find all README.md files (space-safe)
+          # Find all README.md files safely
           while IFS= read -r -d '' readme; do
             folder="$(dirname "$readme")"
-            name="$(basename "$folder")"
 
-            # Skip .github/ and hidden dirs
+            # Skip .github and hidden dirs
+            [[ "$folder" == "." ]] && {
+              NAV+="[🏠 Home](/README.md) • "
+              continue
+            }
             [[ "$folder" == .github* ]] && continue
+            [[ "$folder" == .* ]] && continue
 
-            # Pretty name (replace - with space)
+            name="$(basename "$folder")"
             pretty="$(echo "$name" | sed 's/-/ /g')"
 
-            # Encode path safely using Python
-            encoded=$(python3 - << PY
-import urllib.parse
-print(urllib.parse.quote("$folder".lstrip("./")))
-PY
+            # Encode folder safely for URLs
+            encoded=$(python3 - "$folder" << 'EOF'
+import sys, urllib.parse
+path = sys.argv[1].lstrip("./")
+print(urllib.parse.quote(path))
+EOF
 )
 
-            if [[ "$folder" == "." ]]; then
-              NAV+="[🏠 Home](/README.md) • "
-            else
-              NAV+="[$pretty](/$encoded/README.md) • "
-            fi
+            NAV+="[$pretty](/$encoded/README.md) • "
 
           done < <(find . -type f -name "README.md" -print0)
 
           NAV+="\n\n---\n<!-- inject-nav -->"
 
-          # Save output
           {
             echo "nav<<EOF"
             echo -e "$NAV"
             echo "EOF"
-          } >> $GITHUB_OUTPUT
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Inject nav into README.md
+      - name: Inject nav into README files
         shell: bash
         run: |
           NAV_CONTENT="${{ steps.nav.outputs.nav }}"
-
-          echo "Injecting nav into README.md files..."
+          echo "Injecting nav..."
 
           while IFS= read -r -d '' file; do
             if grep -q "<!-- inject-nav -->" "$file"; then
-              echo "Skipping $file — already injected."
+              echo "Skipping $file — nav already exists."
               continue
             fi
 
