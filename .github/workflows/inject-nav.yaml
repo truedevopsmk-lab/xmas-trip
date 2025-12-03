@@ -1,9 +1,14 @@
 name: Inject Navigation Menu
 
+# Trigger on pushes to main or manually
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
+
+# ensure workflow has write permission so commit/push works
+permissions:
+  contents: write
 
 jobs:
   inject:
@@ -12,69 +17,84 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
 
       - name: Build Navigation Menu
         id: nav
         shell: bash
         run: |
+          set -euo pipefail
           echo "Generating navigation..."
 
-          NAV="## 📘 Navigation Menu\n"
-
-          urlencode() {
-            local raw="$1"
-            python3 - <<EOF
-import urllib.parse
-print(urllib.parse.quote("$raw"))
-EOF
-          }
-
-          # Find README.md files safely
+          NAV="**Navigation**  :  "
+          # iterate safely over README.md files (handles spaces/newlines)
           while IFS= read -r -d '' readme; do
-            folder="$(dirname "$readme")"
+            # folder containing the README
+            folder=$(dirname "$readme")
+            # skip .git and .github and hidden directories
+            case "$folder" in
+              ./.git*|./.github*|./node_modules*|./.venv*) continue ;;
+            esac
 
-            # Skip root and .github
-            [[ "$folder" == "." ]] && continue
-            [[ "$folder" == .github* ]] && continue
+            # prepare a pretty name for display
+            if [[ "$folder" == "." ]]; then
+              display="Home"
+              # root link
+              href="/README.md"
+            else
+              base="$(basename "$folder")"
+              # make pretty: replace '-' with space and keep original case
+              display="$(echo "$base" | sed 's/-/ /g')"
+              # url-encode the path (strip leading ./)
+              encoded=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1].lstrip('./')))" "$folder")
+              href="/$encoded/README.md"
+            fi
 
-            name="$(basename "$folder")"
-            pretty="$(echo "$name" | sed 's/-/ /g')"
-
-            encoded=$(urlencode "$folder")
-
-            NAV+="[$pretty](/$encoded/README.md) • "
-
+            # append to NAV (use bullet ' • ' separator)
+            NAV="$NAV[$display]($href) • "
           done < <(find . -type f -name "README.md" -print0)
 
-          # Add Home link at start
-          NAV="[🏠 Home](/README.md) • $NAV\n\n---\n<!-- inject-nav -->"
+          # trim trailing " • " if present
+          NAV="${NAV% • }"
 
+          # add an anchor so re-runs can detect injection
+          NAV="$NAV\n\n---\n<!-- inject-nav -->"
+
+          # write to outputs (multi-line)
           {
             echo "nav<<EOF"
             echo -e "$NAV"
             echo "EOF"
-          } >> $GITHUB_OUTPUT
+          } >> "$GITHUB_OUTPUT"
 
       - name: Inject nav into README.md files
         shell: bash
         run: |
+          set -euo pipefail
           NAV_CONTENT="${{ steps.nav.outputs.nav }}"
+          echo "Injecting nav into README.md files..."
 
+          # iterate README files and inject nav only if not present
           while IFS= read -r -d '' file; do
-            # Skip injected
             if grep -q "<!-- inject-nav -->" "$file"; then
-              echo "Skipping $file"
+              echo "Skipping $file — nav already present."
               continue
             fi
-
+            echo "Injecting into $file"
             tmp=$(mktemp)
+            # write nav then original content
             echo -e "$NAV_CONTENT" > "$tmp"
             cat "$file" >> "$tmp"
             mv "$tmp" "$file"
-
           done < <(find . -type f -name "README.md" -print0)
 
-      - name: Commit changes
+      - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "Auto-injected navigation menu"
+          file_pattern: "**/README.md"
+          branch: main
+          # token is provided by Actions automatically
+          github_token: ${{ secrets.GITHUB_TOKEN }}
