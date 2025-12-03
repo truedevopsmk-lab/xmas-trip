@@ -21,24 +21,24 @@ jobs:
 
           NAV="## 📘 Navigation Menu\n"
 
-          # Find all README.md files safely (handles spaces)
+          # Find all README.md files (space-safe)
           while IFS= read -r -d '' readme; do
+            folder="$(dirname "$readme")"
+            name="$(basename "$folder")"
 
-            folder=$(dirname "$readme")
-            name=$(basename "$folder")
+            # Skip .github/ and hidden dirs
+            [[ "$folder" == .github* ]] && continue
 
             # Pretty name (replace - with space)
-            pretty=$(echo "$name" | sed 's/-/ /g')
+            pretty="$(echo "$name" | sed 's/-/ /g')"
 
-            # Python safe URL encoding
-            encoded=$(python3 - "$folder" <<EOF
-import sys, urllib.parse
-path = sys.argv[1]
-print(urllib.parse.quote(path.strip("./")))
-EOF
+            # Encode path safely using Python
+            encoded=$(python3 - << PY
+import urllib.parse
+print(urllib.parse.quote("$folder".lstrip("./")))
+PY
 )
 
-            # Root README
             if [[ "$folder" == "." ]]; then
               NAV+="[🏠 Home](/README.md) • "
             else
@@ -49,28 +49,28 @@ EOF
 
           NAV+="\n\n---\n<!-- inject-nav -->"
 
+          # Save output
           {
             echo "nav<<EOF"
             echo -e "$NAV"
             echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          } >> $GITHUB_OUTPUT
 
-      - name: Inject nav into README.md files
+      - name: Inject nav into README.md
         shell: bash
         run: |
           NAV_CONTENT="${{ steps.nav.outputs.nav }}"
 
-          echo "Injecting nav into README files..."
+          echo "Injecting nav into README.md files..."
 
           while IFS= read -r -d '' file; do
             if grep -q "<!-- inject-nav -->" "$file"; then
-              echo "Skipping $file — nav already present."
+              echo "Skipping $file — already injected."
               continue
             fi
 
             echo "Injecting into $file"
             tmp=$(mktemp)
-
             echo -e "$NAV_CONTENT" > "$tmp"
             cat "$file" >> "$tmp"
             mv "$tmp" "$file"
