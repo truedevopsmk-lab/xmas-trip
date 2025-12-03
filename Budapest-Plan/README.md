@@ -1,3 +1,9 @@
+## 📘 Navigation Menu
+[🏠 Home](/README.md) • [Budapest](/Budapest/README.md) • [Attractions, Cafés & Local Specialties](/Attractions, Cafés & Local Specialties/README.md) • [Trip Packing Checklist](/Trip Packing Checklist/README.md) • [Budapest Plan](/Budapest-Plan/README.md)
+
+---
+<!-- inject-nav -->
+
 # 🇭🇺 Budapest – 2.5 Day Itinerary (Perfect for Christmas Season)
 
 This itinerary is designed for a short 2.5-day trip to Budapest during winter, focusing on the **best views**, **Christmas markets**, **iconic landmarks**, and **relaxed walking routes** — while **skipping time-consuming museums and interior visits**.

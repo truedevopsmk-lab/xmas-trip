@@ -1,3 +1,9 @@
+## 📘 Navigation Menu
+[🏠 Home](/README.md) • [Budapest](/Budapest/README.md) • [Attractions, Cafés & Local Specialties](/Attractions, Cafés & Local Specialties/README.md) • [Trip Packing Checklist](/Trip Packing Checklist/README.md) • [Budapest Plan](/Budapest-Plan/README.md)
+
+---
+<!-- inject-nav -->
+
 Nice — here’s a tight, practical **2.5-day Budapest plan** that fits your *Top-15* hits while **skipping time-heavy interiors/museums**. I assume you arrive **~12:35 Day 0**, clear airport, and can start exploring ~15:00. If your arrival is later or you feel jet-lagged, trim Day-0 slightly.
 
 I give (A) a high-level plan per half/full day, (B) a timed walkable schedule you can follow, and (C) quick tips (tickets, transport, priorities). Let’s go.

@@ -1,3 +1,9 @@
+## 📘 Navigation Menu
+[🏠 Home](/README.md) • [Budapest](/Budapest/README.md) • [Attractions, Cafés & Local Specialties](/Attractions, Cafés & Local Specialties/README.md) • [Trip Packing Checklist](/Trip Packing Checklist/README.md) • [Budapest Plan](/Budapest-Plan/README.md)
+
+---
+<!-- inject-nav -->
+
 ---
 
 # **Eurotripv5 – Europe Winter Itinerary (Dec 21–31, 2025)**
