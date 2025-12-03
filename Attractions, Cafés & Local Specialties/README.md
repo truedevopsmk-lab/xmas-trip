@@ -1,3 +1,7 @@
+**Navigation**  :  [Budapest](/Budapest/README.md) • [Home](/README.md) • [Attractions, Cafés & Local Specialties](/Attractions%2C%20Caf%C3%A9s%20%26%20Local%20Specialties/README.md) • [Trip Packing Checklist](/Trip%20Packing%20Checklist/README.md) • [Budapest Plan](/Budapest-Plan/README.md)
+
+---
+<!-- inject-nav -->
 
 # Europe Winter Trip 2025 – Attractions, Cafés & Local Food
 
