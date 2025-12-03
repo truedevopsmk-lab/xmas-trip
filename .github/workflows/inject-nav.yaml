@@ -2,88 +2,86 @@ name: Inject Navigation Menu
 
 on:
   push:
-    branches:
-      - main
-
-permissions:
-  contents: write
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   inject:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build navigation menu dynamically
+      - name: Build Navigation Menu
         id: nav
+        shell: bash
         run: |
           echo "Generating navigation..."
 
           NAV="## 📘 Navigation Menu\n"
 
-          # Add root Home link
-          NAV+="[🏠 Home](/README.md)"
+          # Find all folders containing README.md (space-safe)
+          while IFS= read -r -d '' readme; do
 
-          # Loop through folders safely
-          while IFS= read -r -d '' folder; do
-            # Skip hidden folders and .github
-            basename=$(basename "$folder")
-            case "$basename" in
-              .*|.github|.git) continue ;;
-            esac
+            # Extract folder path
+            folder=$(dirname "$readme")
 
-            # If folder contains a README.md, add it to nav
-            if [ -f "$folder/README.md" ]; then
-              link_name="${basename//-/ }"
-              NAV+=" • [${link_name^}](/$basename/README.md)"
+            # Make human-readable title (strip ./ and replace '-' with ' ')
+            name=$(basename "$folder")
+            pretty=$(echo "$name" | sed 's/-/ /g')
+
+            # URL-encode the folder path
+            encoded=$(python3 - <<EOF
+import urllib.parse
+print(urllib.parse.quote("$folder"))
+EOF
+)
+
+            # Skip the root README
+            if [[ "$folder" == "." ]]; then
+              NAV+="[🏠 Home](/README.md) • "
+            else
+              NAV+="[$pretty](/$encoded/README.md) • "
             fi
-          done < <(find . -mindepth 1 -maxdepth 1 -type d -print0)
 
-          NAV+="\n\n---\n<!-- inject-nav -->\n"
+          done < <(find . -type f -name README.md -print0)
+
+          NAV+="\n\n---\n<!-- inject-nav -->"
 
           # Save nav to output
-          echo "nav<<EOF" >> $GITHUB_ENV
-          echo -e "$NAV" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          echo "nav<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$NAV" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Inject nav into READMEs
+      - name: Inject nav into README.md files
+        shell: bash
         run: |
-          echo "Injecting into README.md files..."
+          NAV_CONTENT="${{ steps.nav.outputs.nav }}"
 
-          # For every README.md found
-          find . -type f -name "README.md" -print0 | while IFS= read -r -d '' file; do
+          echo "Injecting nav menu..."
+
+          # Apply to all README.md files
+          while IFS= read -r -d '' file; do
 
             # Skip if already injected
             if grep -q "<!-- inject-nav -->" "$file"; then
-              echo "Skipping $file (already injected)"
+              echo "Skipping $file — already has nav."
               continue
             fi
 
-            echo "Injecting navigation into $file"
+            echo "Injecting into $file"
 
-            # temp file
-            TMP=$(mktemp)
+            tmp=$(mktemp)
 
             # Write nav + original file
-            echo -e "$nav" > "$TMP"
-            cat "$file" >> "$TMP"
+            echo -e "$NAV_CONTENT" > "$tmp"
+            cat "$file" >> "$tmp"
+            mv "$tmp" "$file"
 
-            mv "$TMP" "$file"
-          done
+          done < <(find . -type f -name README.md -print0)
 
       - name: Commit changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-
-          # Commit only if there are changes
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "Auto-injected navigation menu"
-            git push
-          fi
-
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Auto-injected nav menu"
