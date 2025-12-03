@@ -1,3 +1,5 @@
+<!-- inject-nav -->
+
 # Europe Winter Trip 2025 – Master Checklist
 
 **Trip dates:** 21 Dec 2025 – 31 Dec 2025  
